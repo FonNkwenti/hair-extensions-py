@@ -1,0 +1,160 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  hair-extensions
+
+Transform:
+- AWS::Serverless-2016-10-31
+
+Globals:
+
+  # Enable Logs
+  Api:
+    MethodSettings:
+      - ResourcePath: "/*"
+        HttpMethod: "*"
+        DataTraceEnabled: True
+        LoggingLevel: INFO
+        MetricsEnabled: True
+  Function:
+    Timeout: 10
+    Runtime: nodejs18.x
+
+Resources:
+
+  HairExtensionsAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      OpenApiVersion: 3.0.3
+      DefinitionBody: # an OpenApi definition
+        "Fn::Transform":
+          Name: "AWS::Include"
+          Parameters:
+            Location: "hair-extension-api.yaml"
+      EndpointConfiguration:
+        Type: REGIONAL
+
+  listExtensionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/listExtensions
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: A simple example includes a HTTP get method to get all items from a DynamoDB table.
+      Policies:
+        # Give Create/Read/Update/Delete Permissions to the SampleTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SampleTable
+      Environment:
+        Variables:
+          # Make table name accessible as environment variable from function code during execution
+          SAMPLE_TABLE: !Ref SampleTable
+      # Events:
+      #   Api:
+      #     Type: Api
+      #     Properties:
+      #       Path: /
+      #       Method: GET
+
+  getExtensionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/getExtension
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: A simple example includes a HTTP get method to get one item by id from a DynamoDB table.
+      Policies:
+        # Give Create/Read/Update/Delete Permissions to the SampleTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SampleTable
+      Environment:
+        Variables:
+          SAMPLE_TABLE: !Ref SampleTable
+      # Events:
+      #   Api:
+      #     Type: Api
+      #     Properties:
+      #       Path: /{id}
+      #       Method: GET
+  # Each Lambda function is defined by properties:
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+
+  # This is a Lambda function config associated with the source code: put-item.js
+  createExtensionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/createExtension
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: A simple example includes a HTTP post method to add one item to a DynamoDB table.
+      Policies:
+        # Give Create/Read/Update/Delete Permissions to the SampleTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SampleTable
+      Environment:
+        Variables:
+          # Make table name accessible as environment variable from function code during execution
+          SAMPLE_TABLE: !Ref SampleTable
+      # Events:
+      #   Api:
+      #     Type: Api
+      #     Properties:
+      #       Path: /
+      #       Method: POST
+  # Simple syntax to create a DynamoDB table with a single attribute primary key, more in
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlesssimpletable
+
+  # DynamoDB table to store item: {id: &lt;ID&gt;, name: &lt;NAME&gt;}
+  SampleTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: extensionId
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+
+    # Execution Role for lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: AllowLambdaExec
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 'lambda:InvokeFunction'
+                Resource: "*"
+                # Resource: [
+                #   !GetAtt listExtensionsFunction.Arn, 
+                #   !GetAtt getExtensionFunction.Arn,
+                #   !GetAtt createExtensionFunction.Arn,
+                #   !GetAtt updateExtensionFunction.Arn,
+                #   !GetAtt deleteExtensionFunction.Arn
+                # ]  
+
+Outputs:
+  WebEndpoint:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${HairExtensionsAPI}.execute-api.${AWS::Region}.amazonaws.com/dev/"
