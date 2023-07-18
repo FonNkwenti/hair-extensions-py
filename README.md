@@ -70,5 +70,3 @@ Contributions are welcome! If you find any issues or have suggestions for improv
 
 This project is licensed under the [MIT License](LICENSE).
 ```
-
-Feel free to copy the above markdown and use it as your project's README.md file on GitHub.
